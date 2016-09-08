@@ -1,0 +1,108 @@
+#vim: set ft=python:
+shell.prefix("set -eo pipefail; ")
+
+from os.path import join, basename, dirname, exists
+from os import getcwd, makedirs
+from subprocess import check_output
+from glob import glob
+
+from snakemake.utils import min_version
+
+min_version("3.4.1")
+
+# Globals ---------------------------------------------------------------------
+
+include: "../../config.py"
+configfile: "config.yml"
+
+OUTDIR  = config["outdir"]
+RESULTS = config["results"]
+
+# Job Handlers ----------------------------------------------------------------
+
+onsuccess:
+  print("Workflow finished, without any errors!")
+
+#onerror:
+#  shell("send_email.py -t philippross369@gmail.com -s 'Snakefile error' -b {log}")
+
+# Rules -----------------------------------------------------------------------
+
+rule all:
+  input:
+    join(RESULTS, "report.html")
+
+
+# Summarise alignments using deepTools
+rule summarize_alignments:
+  input:
+    alignments  = config["alignments"].split(" "),
+    blacklist   = config["blacklist"]
+  output:
+    array  = join(OUTDIR, "multi_bam_summary.npz"),
+    counts = join(OUTDIR, "raw_counts.tsv")
+  params:
+    labels  = config["labels"],
+    extsize = config["extsize"]
+  threads: 8
+  log:
+    join(LOGS, "multi_bam_summary.log")
+  run:
+    shell("(multiBamSummary bins --bamfiles {input.alignments} "+\
+	  "--outFileName {output.array} "+\
+    "--outRawCounts {output.counts} "+\
+    "--binSize 500 "+\
+    "--labels {params.labels} "+\
+    "--extendReads {params.extsize} "+\
+    "--centerReads "+\
+    "--blackListFileName {input.blacklist} "+\
+    "--numberOfProcessors {threads}) 2> {log}")
+
+
+# Plot correlation of all alignments and cluster them to assess reproducibility
+rule plot_correlation:
+  input:
+    summary = join(OUTDIR,"multi_bam_summary.npz"),
+  output:
+    pdf    = join(OUTDIR, "correlation_plot.pdf"),
+    png    = join(OUTDIR, "correlation_plot.png"),
+    matrix = join(OUTDIR, "correlation_matrix.tsv")
+  params:
+    labels  = config["labels"]
+  threads: 8
+  log:
+    join(LOGS, "plot_correlation.log")
+  run:
+    # plot correlation as PDF
+    shell("(plotCorrelation --corData {input.summary} "+\
+	  "--plotFile {output.pdf} "+\
+    "--outFileCorMatrix {output.matrix} "+\
+    "--corMethod 'pearson' "+\
+    "--whatToPlot 'heatmap' "+\
+    "--plotTitle 'Pearson Correlation of Read Counts' "+\
+    "--labels {params.labels} "+\
+    "--skipZeros "+\
+    "--colorMap 'RdYlBu' "+\
+    "--plotNumbers) 2> {log}")
+    # convert to PNG
+    shell("convert -verbose -density 500 -resize '800' {output.pdf} {output.png}")
+
+
+# Write a report of some kind
+rule report:
+  input:
+    join(OUTDIR, "multi_bam_summary.npz"),
+    join(OUTDIR, "raw_counts.tsv"),
+    join(OUTDIR, "correlation_plot.pdf"),
+    join(OUTDIR, "correlation_plot.png"),
+    join(OUTDIR, "correlation_matrix.tsv"),
+    script = "report.Rmd"
+  output:
+    join(RESULTS, "report.html")
+  run:
+    shell(source_rmd(getcwd(), input.script, RESULTS))
+
+
+rule clean:
+  run:
+    shell("rm -rf "+join(RESULTS, "report.html"))

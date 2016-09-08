@@ -1,0 +1,26 @@
+outdir: "../../data/annotation"
+results: "../../results/annotation"
+# Samples ---------------------------------------------------------------------
+samples:
+  ap2i_r1:
+    gfp: "../../data/peaks/ap2i_r1_gfp_peaks.narrowPeak"
+    igg: "../../data/peaks/ap2i_r1_igg_peaks.narrowPeak"
+  ap2i_r2:
+    gfp: "../../data/peaks/ap2i_r2_gfp_peaks.narrowPeak"
+    igg: "../../data/peaks/ap2i_r2_igg_peaks.narrowPeak"
+  ap2i_r3:
+    gfp: "../../data/peaks/ap2i_r3_gfp_peaks.narrowPeak"
+    igg: "../../data/peaks/ap2i_r3_igg_peaks.narrowPeak"
+  ap2i_r4:
+    gfp: "../../data/peaks/ap2i_r4_gfp_peaks.narrowPeak"
+    igg: "../../data/peaks/ap2i_r4_igg_peaks.narrowPeak"
+  ap2i_r5:
+    gfp: "../../data/peaks/ap2i_r5_gfp_peaks.narrowPeak"
+    igg: "../../data/peaks/ap2i_r5_igg_peaks.narrowPeak"
+# Motif analysis --------------------------------------------------------------
+genome: "../../data/genomes/pfdd2.genome"
+reference: "../../data/genomes/pfdd2.fasta"
+features: "../../data/genomes/pfdd2_genes.gff"
+motifdb: "../../data/motifs/ap2_pbm_cores.meme"
+slop: "250"
+seed: "1367"

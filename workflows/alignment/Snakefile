@@ -1,0 +1,112 @@
+# vim: set ft=python:
+shell.prefix("set -eo pipefail; ")
+
+from os.path import join, basename, dirname, exists
+from os import getcwd, makedirs
+from subprocess import check_output
+from glob import glob
+
+from snakemake.utils import min_version
+
+min_version("3.4.1")
+
+# Globals ---------------------------------------------------------------------
+
+include: "../../config.py"
+configfile: "config.yml"
+
+NAMES   = list(config["samples"].keys())
+OUTDIR  = config["outdir"]
+RESULTS = config["results"]
+
+# Job Handlers ----------------------------------------------------------------
+
+onsuccess:
+  print("Workflow finished, without any errors!")
+
+#onerror:
+#  shell("send_email.py -t philippross369@gmail.com -s 'Snakefile error' -b {log}")
+
+# Rules -----------------------------------------------------------------------
+
+rule all:
+  input:
+    join(RESULTS, "report.html")
+
+
+rule run_fastqc:
+  input:
+    reads = lambda wildcards: config["samples"][wildcards.name]
+  output:
+    join(OUTDIR, "fastq/{name}_fastqc.html")
+  threads: 8
+  log:
+    join(LOGS, "{name}_fastqc.log")
+  shell:
+    "(fastqc --extract --nogroup --threads {threads} {input.reads}) 2> {log}"
+
+
+rule run_trimmomatic:
+  input:
+    reads    = lambda wildcards: config["samples"][wildcards.name],
+    adapters = lambda wildcards: config["adapters"]
+  output:
+    join(OUTDIR, "fastq/trimmed_{name}.fastq.gz")
+  params:
+    window_length   = config["window_length"],
+    minimum_quality = config["minimum_quality"],
+    minimum_length  = config["minimum_length"],
+    stats           = join(LOGS, "{name}_trimmomatic.stats")
+  threads: 8
+  log:
+    join(LOGS, "{name}_trimmomatic.log")
+  shell:
+    "(trimmomatic SE -threads {threads} -phred33 -trimlog {log} "
+    "{input.reads} " 
+    "{output} " 
+    "ILLUMINACLIP:{input.adapters}:2:2:2 "
+    "SLIDINGWINDOW:{params.window_length}:{params.minimum_quality} " 
+    "MINLEN:{params.minimum_length} "
+    "TRAILING:{params.minimum_quality}) 2>> {params.stats}"
+
+
+rule run_bwa:
+  input:
+    reads = join(OUTDIR, "fastq/trimmed_{name}.fastq.gz"),
+    index = config["reference"]
+  output:
+    all          = join(OUTDIR, "bam/{name}.bam"),
+    all_idx      = join(OUTDIR, "bam/{name}.bam.bai"),
+    filtered     = join(OUTDIR, "bam/flt_{name}.bam"),
+    filtered_idx = join(OUTDIR, "bam/flt_{name}.bam.bai"),
+    stats        = join(OUTDIR, "bam/{name}.flagstat")
+  params:
+    flags = config["bwa_flags"]
+  threads: 8
+  log:
+    join(LOGS, "{name}_bwa.log")
+  shell:
+    "(bwa mem {params.flags} -t {threads} {input.index} {input.reads} | samtools view -bh - | samtools sort -O bam -T XXX - > {output.all} && "
+    "samtools index {output.all} && "
+    "samtools flagstat {output.all} > {output.stats} && "
+    "samtools view -bh -F 256 -F 2048 -F 1024 -q 30 {output.all} | samtools sort -O bam -T XXX - > {output.filtered} && "
+    "samtools index {output.filtered}) 2> {log}"
+
+
+rule report:
+  input:
+    expand(join(OUTDIR, "bam/{name}.bam"), name=NAMES),
+    expand(join(OUTDIR, "bam/{name}.bam.bai"), name=NAMES),
+    expand(join(OUTDIR, "bam/{name}.flagstat"), name=NAMES),
+    expand(join(OUTDIR, "bam/flt_{name}.bam"), name=NAMES),
+    expand(join(OUTDIR, "bam/flt_{name}.bam.bai"), name=NAMES),
+    script = "report.Rmd"
+  output:
+    join(RESULTS, "report.html")
+  run:
+    shell(source_rmd(getcwd(), input.script, RESULTS))
+
+
+rule clean:
+  run:
+    shell("rm -rf "+ join(RESULTS, "report.html"))

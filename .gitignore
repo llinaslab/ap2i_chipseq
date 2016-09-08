@@ -1,0 +1,40 @@
+# Folder view configuration files
+.DS_Store
+Desktop.ini
+
+# Thumbnail cache files
+._*
+Thumbs.db
+
+# Files that might appear on external disks
+.Spotlight-V100
+.Trashes
+
+# R stuff
+.Rhistory
+.Rapp.history
+.RData
+*-Ex.R
+.Rproj.user/
+vignettes/*.html
+vignettes/*.pdf
+.Rproj.user
+*.Rproj
+.start_rstudio.sh
+.rsession.conf
+
+# Python stuff
+*.pyc
+.ipynb_checkpoints/
+*.ipynb
+
+# C stuff
+*.out
+
+# Don't version control data or plots
+data
+logs
+workflows/final
+
+# Snakemake
+.snakemake

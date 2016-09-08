@@ -1,0 +1,66 @@
+---
+title: "Quality control and mapping statistics"
+author: "Philipp Ross"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 2
+    theme: yeti
+    highlight: default
+    css: ../../assets/styles.css
+---
+
+```{r chunk-options,echo=F}
+knitr::opts_chunk$set(echo = F, fig.align = "center", fig.width = 8, fig.height = 8, tidy = T, error = F, warning = F)
+source("../../scripts/utils.R")
+load_R_essentials()
+```
+
+## Aliases
+
+The following are the aliases for all file names in case anyone needs to refer back to the original sample names.
+
+```{r aliases}
+aliases <- read_tsv("../../data/fastq/aliases.tsv",col_names=F)
+sshhh("DT")
+datatable(aliases,rownames=F,pageLength=25) 
+```
+
+## Read preprocessing
+
+Due to adapter contamination, all raw read files were trimmed using trimmomatic.
+
+```{r trim-stats}
+trim <- read_tsv("../../data/fastq/trim_stats.tsv")
+datatable(trim,rownames=F,pageLength=25)
+```
+
+## Alignment statistics
+
+The new ChIP-seq replicates had a much higher proportion of reads mapping to the *Plasmodium* compared to the first two replicates.
+
+These are the raw read alignment statistics:
+
+```{r raw-mapped}
+read_flagstat <- function(file) {
+  tmp <- read_lines(file)[5]
+  out <- list(name=unlist(strsplit(basename(file),"[.]"))[1],mapped=str_replace(str_replace(tmp, "[+] 0 mapped ", ""), " : N/A",""))
+}
+
+file_list <- list.files(path = "../../data/bam",pattern="*.flagstat$",full.names=T)
+stats <- sapply(file_list, read_flagstat)
+stats <- as.data.frame(matrix(unlist(stats),nrow=15,byrow=T))
+colnames(stats) <- c("library", "percent_mapped")
+datatable(stats,rownames=F,pageLength=25)
+```
+
+Finally, we filter these mapped read files to keep only high quality, non-duplicate, primary alignments.
+
+The following table shows how many reads are used to call peaks:
+
+```{r filter-stats}
+flt <- read_tsv("../../data/bam/flt_stats.tsv",col_names=F)
+datatable(flt,rownames=F,pageLength=25)
+```

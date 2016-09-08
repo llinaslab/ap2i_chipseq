@@ -1,0 +1,29 @@
+outdir: "../../data/"
+results: "../../results/alignment"
+# Samples ---------------------------------------------------------------------
+samples:
+  ap2i_gfp_ipt_r5: "../../data/fastq/ap2i_gfp_input_r5.fastq.gz"
+  ap2i_gfp_r1: "../../data/fastq/ap2i_gfp_r1.fastq.gz"
+  ap2i_gfp_r2: "../../data/fastq/ap2i_gfp_r2.fastq.gz"
+  ap2i_gfp_r3: "../../data/fastq/ap2i_gfp_r3.fastq.gz"
+  ap2i_gfp_r4: "../../data/fastq/ap2i_gfp_r4.fastq.gz"
+  ap2i_gfp_r5: "../../data/fastq/ap2i_gfp_r5.fastq.gz"
+  ap2i_igg_ipt_r5: "../../data/fastq/ap2i_igg_input_r5.fastq.gz"
+  ap2i_igg_r1: "../../data/fastq/ap2i_igg_r1.fastq.gz"
+  ap2i_igg_r2: "../../data/fastq/ap2i_igg_r2.fastq.gz"
+  ap2i_igg_r3: "../../data/fastq/ap2i_igg_r3.fastq.gz"
+  ap2i_igg_r5: "../../data/fastq/ap2i_igg_r5.fastq.gz"
+  ap2i_ipt_r1: "../../data/fastq/ap2i_input_r1.fastq.gz"
+  ap2i_ipt_r2: "../../data/fastq/ap2i_input_r2.fastq.gz"
+  ap2i_ipt_r3: "../../data/fastq/ap2i_input_r3.fastq.gz"
+  ap2i_ipt_r4: "../../data/fastq/ap2i_input_r4.fastq.gz"
+# Genome ----------------------------------------------------------------------
+reference: "../../data/genomes/pfdd2.fasta"
+annotation: "../../data/genomes/pfdd2.gff"
+# Trimmomatic -----------------------------------------------------------------
+adapters: "../../data/adapters/adapters.fasta"
+window_length: "4" 
+minimum_quality: "30"
+minimum_length: "36"
+# BWA MEM ---------------------------------------------------------------------
+bwa_flags: "-a"

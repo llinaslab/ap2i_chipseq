@@ -1,0 +1,17 @@
+outdir: "../../data/test"
+results: "../../results/test/alignment"
+# Samples ---------------------------------------------------------------------
+samples:
+  chip: "../../data/test/fastq/sample_chip.fastq.gz"
+  input: "../../data/test/fastq/sample_input.fastq.gz"
+  igg: "../../data/test/fastq/sample_igg.fastq.gz"
+# Genome ----------------------------------------------------------------------
+reference: "../../data/genomes/pfdd2.fasta"
+annotation: "../../data/genomes/pfdd2.gff"
+# Trimmomatic -----------------------------------------------------------------
+adapters: "../../data/adapters/adapters.fasta"
+window_length: "4" 
+minimum_quality: "30"
+minimum_length: "36"
+# BWA MEM ---------------------------------------------------------------------
+bwa_flags: "-a"

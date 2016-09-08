@@ -1,0 +1,9 @@
+outdir: "../../data/test/peaks"
+results: "../../results/test/peaks"
+# Samples ---------------------------------------------------------------------
+samples:
+  test:
+    chip: "../../data/test/bam/flt_chip.bam"
+    input: "../../data/test/bam/flt_input.bam"
+    igg: "../../data/test/bam/flt_igg.bam"
+    extsize: "250"

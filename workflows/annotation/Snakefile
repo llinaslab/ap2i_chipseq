@@ -1,0 +1,228 @@
+# vim: set ft=python:
+shell.prefix("set -eo pipefail; ")
+
+from os.path import join, basename, dirname, exists
+from os import getcwd, makedirs
+from subprocess import check_output
+from glob import glob
+
+from snakemake.utils import min_version
+
+min_version("3.4.1")
+
+# Globals ---------------------------------------------------------------------
+
+include: "../../config.py"
+configfile: "config.yml"
+
+SAMPLES   = list(config["samples"].keys())
+OUTDIR  = config["outdir"]
+RESULTS = config["results"]
+
+# Job Handlers ----------------------------------------------------------------
+
+onsuccess:
+  print("Workflow finished, without any errors!")
+
+#onerror:
+#  shell("send_email.py -t philippross369@gmail.com -s 'Snakefile error' -b {log}")
+
+# Rules -----------------------------------------------------------------------
+
+rule all:
+  input:
+    join(RESULTS, "report.html")
+
+
+# filter peaks by peaks found in respective negative control 
+rule filter_peaks:
+  input:
+    gfp = lambda wildcards: config["samples"][wildcards.name]["gfp"],
+    igg = lambda wildcards: config["samples"][wildcards.name]["igg"]
+  output:
+    summits  = join(OUTDIR, "{name}_peak_summit_intervals.narrowPeak"),
+    filtered = join(OUTDIR, "{name}_peak_intervals.narrowPeak")
+  shell:
+    "bedtools intersect -a {input.gfp} -b {input.igg} -v | "
+    "awk 'BEGIN {{OFS=FS=\"\t\"}} {{print $1,$2+$10,$2+$10+1,$4,$5,$6,$7,$8,$9,$10}}' > {output.summits} && "
+    "bedtools intersect -a {input.gfp} -b {input.igg} -v > {output.filtered}"
+
+
+# create random peak intervals to compare to
+rule make_random_intervals:
+  input:
+    join(OUTDIR, "{name}_peak_summit_intervals.narrowPeak")
+  output:
+    join(OUTDIR, "{name}_random_summit_intervals.bed")
+  params:
+    genome = config["genome"],
+    slop   = config["slop"],
+    seed   = config["seed"]
+  run:
+    length = str(int(params.slop)*2)
+    num_lines = str(sum(1 for line in open(input[0])))
+    shell("bedtools random -g {params.genome} -l {length} -n {num_lines} -seed {params.seed} > {output}")
+    
+
+# extract peak sequences from peak intervals
+rule extract_peak_sequences:
+  input:
+    join(OUTDIR, "{name}_peak_summit_intervals.narrowPeak"),
+  output:
+    join(OUTDIR, "{name}_peak_summit_intervals.fasta")
+  params:
+    genome    = config["genome"],
+    slop      = config["slop"],
+    reference = config["reference"]
+  run:
+    right_slop = str(int(params.slop)-1)
+    shell("bedtools slop -i {input} -g {params.genome} -l {params.slop} -r {right_slop} | bedtools getfasta -fi {params.reference} -bed - -fo {output} -name")
+
+
+# create sequences from random intervals
+rule extract_random_sequences:
+  input:
+    join(OUTDIR, "{name}_random_summit_intervals.bed")
+  output:
+    join(OUTDIR, "{name}_random_summit_intervals.fasta")
+  params:
+    reference  = config["reference"]
+  run:
+    shell("bedtools getfasta -fi {params.reference} -bed {input} -fo {output} -name")
+
+
+# perform de novo motif enrichment
+rule run_dreme:
+  input:
+    peaks  = join(OUTDIR, "{name}_peak_summit_intervals.fasta"),
+    random = join(OUTDIR, "{name}_random_summit_intervals.fasta")
+  output:
+    join(OUTDIR, "{name}_dreme/dreme.html")
+  params:
+    outdir = join(OUTDIR, "{name}_dreme")
+  log:
+    join(LOGS, "{name}_dreme.log")
+  run:
+    shell("(dreme -oc {params.outdir} -p {input.peaks} -n {input.random} -mink 6 -maxk 10 -m 6) 2> {log}")
+
+
+# search for motifs within peak intervals
+rule run_fimo:
+  input:
+    seqs   = join(OUTDIR, "{name}_peak_summit_intervals.fasta"),
+    motifs = join(OUTDIR, "{name}_dreme/dreme.html"),
+    cores  = config["motifdb"]
+  output:
+    background     = join(OUTDIR, "{name}_peak_summit_intervals.background"),
+    dreme_hits     = join(OUTDIR, "{name}_fimo_dreme/fimo.html"),
+    dreme_hits_gff = join(OUTDIR, "{name}_fimo_dreme/fimo.gff"),
+    cores_hits     = join(OUTDIR, "{name}_fimo_cores/fimo.html"),
+    cores_hits_gff = join(OUTDIR, "{name}_fimo_cores/fimo.gff")
+  params:
+    outdir_dreme = join(OUTDIR, "{name}_fimo_dreme"),
+    outdir_cores = join(OUTDIR, "{name}_fimo_cores")
+  log:
+    join(LOGS, "{name}_fimo.log")
+  run:
+    shell("cat {input.seqs} | fasta-get-markov -m 3 > {output.background}")
+    shell("(fimo --bgfile {output.background} --oc {params.outdir_dreme} --thresh 1e-4 {input.motifs} {input.seqs} || echo 'FIMO failed') 2> {log}")
+    shell("(fimo --bgfile {output.background} --oc {params.outdir_cores} --thresh 1e-4 {input.cores} {input.seqs} || echo 'FIMO failed') 2> {log}")
+
+
+# check for location-wise enrichment of motifs within peaks
+rule run_centrimo:
+  input:
+    peaks      = join(OUTDIR, "{name}_peak_summit_intervals.fasta"),
+    random     = join(OUTDIR, "{name}_random_summit_intervals.fasta"),
+    dreme      = join(OUTDIR, "{name}_dreme/dreme.html"),
+    background = join(OUTDIR, "{name}_peak_summit_intervals.background")
+  output:
+    join(OUTDIR, "{name}_centrimo/centrimo.html")
+  params:
+    outdir = join(OUTDIR, "{name}_centrimo")
+  log:
+    join(LOGS, "{name}_centrimo.log")
+  run:
+    shell("(centrimo -oc {params.outdir} --flip --bgfile {input.background} --neg {input.random} {input.peaks} {input.dreme}) 2> {log}")
+
+
+# compare found motifs to known motifs
+rule run_tomtom:
+  input:
+    motifs     = join(OUTDIR, "{name}_dreme/dreme.html"),
+    background = join(OUTDIR, "{name}_peak_summit_intervals.background"),
+    cores      = config["motifdb"],
+  output:
+    join(OUTDIR, "{name}_tomtom/tomtom.html")
+  params:
+    outdir = join(OUTDIR, "{name}_tomtom")
+  log:
+    join(LOGS, "{name}_tomtom.log")
+  run:
+    shell("(tomtom -bfile {input.background} -min-overlap 4 -oc {params.outdir} {input.cores} {input.motifs}) 2> {log}")
+
+
+# annotate peaks using gene models
+rule annotate_peaks:
+  input:
+    script       = "../../scripts/annotate_macs2_peaks.py",
+    peak_summits = join(OUTDIR, "{name}_peak_summit_intervals.narrowPeak"),
+    pbm_motifs   = join(OUTDIR, "{name}_fimo_cores/fimo.gff"),
+    dreme_motifs = join(OUTDIR, "{name}_fimo_dreme/fimo.gff")
+  output:
+    join(OUTDIR, "{name}_annotation.csv"),
+    join(OUTDIR, "{name}_annotation.gff")
+  params:
+    genome   = config["genome"],
+    slop     = config["slop"],
+    features = config["features"],
+    outdir   = OUTDIR
+  log:
+    join(LOGS, "{name}_annotation.log")
+  shell:
+    "(python {input.script} "
+    "--features {params.features} "
+    "--genome {params.genome} "
+    "--peaks {input.peak_summits} "
+    "--pbm-motifs {input.pbm_motifs} "
+    "--dreme-motifs {input.dreme_motifs} "
+    "--motif-region {params.slop} "
+    "--output-dir {params.outdir} "
+    "--name {wildcards.name}) 2> {log}"
+
+rule sort_output:
+  input:
+    gff = join(OUTDIR, "{name}_annotation.gff"),
+    csv = join(OUTDIR, "{name}_annotation.csv")
+  output:
+    gff = join(OUTDIR, "{name}_annotations.gff"),
+    csv = join(OUTDIR, "{name}_annotations.csv")
+  shell:
+    "cat {input.gff} | sort -k1,1 -k4,4n > tmp; cat tmp > {output.gff}; "
+    "(head -n 1 {input.csv} && tail -n +2 {input.csv} | sort -t ',' -k1,1 -k4,4n) > tmp; cat tmp > {output.csv}; "
+    "rm -rf {input.gff} {input.csv}"
+
+
+rule report:
+  input:
+    expand(join(OUTDIR, "{name}_peak_summit_intervals.narrowPeak"), name=SAMPLES),
+    expand(join(OUTDIR, "{name}_peak_intervals.narrowPeak"),        name=SAMPLES),
+    expand(join(OUTDIR, "{name}_dreme/dreme.html"),                 name=SAMPLES),
+    expand(join(OUTDIR, "{name}_fimo_dreme/fimo.html"),             name=SAMPLES),
+    expand(join(OUTDIR, "{name}_fimo_dreme/fimo.gff"),              name=SAMPLES),
+    expand(join(OUTDIR, "{name}_fimo_cores/fimo.html"),             name=SAMPLES),
+    expand(join(OUTDIR, "{name}_fimo_cores/fimo.gff"),              name=SAMPLES),
+    expand(join(OUTDIR, "{name}_tomtom/tomtom.html"),               name=SAMPLES),
+    expand(join(OUTDIR, "{name}_centrimo/centrimo.html"),           name=SAMPLES),
+    expand(join(OUTDIR, "{name}_annotations.csv"),                  name=SAMPLES),
+    expand(join(OUTDIR, "{name}_annotations.gff"),                  name=SAMPLES),
+    script = "report.Rmd"
+  output:
+    join(RESULTS, "report.html")
+  run:
+    shell(source_rmd(getcwd(), input.script, RESULTS))
+
+
+rule clean:
+  run:
+    shell("rm -rf "+join(RESULTS, "report.html"))

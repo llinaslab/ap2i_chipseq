@@ -1,0 +1,12 @@
+outdir: "../../data/test/annotation"
+results: "../../results/test/annotation"
+# Samples ---------------------------------------------------------------------
+samples:
+  test:
+    chip: "../../data/test/peaks/test_chip_peaks.narrowPeak"
+    igg: "../../data/test/peaks/test_mock_peaks.narrowPeak"
+# Motif analysis --------------------------------------------------------------
+genome: "../../data/genomes/pfdd2.genome"
+reference: "../../data/genomes/pfdd2.fasta"
+slop: "250"
+seed: "1367"

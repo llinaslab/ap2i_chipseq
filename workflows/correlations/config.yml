@@ -1,0 +1,7 @@
+outdir: "../../data/correlations"
+results: "../../results/correlations"
+alignments: "../../data/bam/flt_ap2i_gfp_ipt_r5.bam ../../data/bam/flt_ap2i_gfp_r1.bam ../../data/bam/flt_ap2i_gfp_r2.bam ../../data/bam/flt_ap2i_gfp_r3.bam ../../data/bam/flt_ap2i_gfp_r4.bam ../../data/bam/flt_ap2i_gfp_r5.bam ../../data/bam/flt_ap2i_igg_ipt_r5.bam ../../data/bam/flt_ap2i_igg_r1.bam ../../data/bam/flt_ap2i_igg_r2.bam ../../data/bam/flt_ap2i_igg_r3.bam ../../data/bam/flt_ap2i_igg_r5.bam ../../data/bam/flt_ap2i_ipt_r1.bam ../../data/bam/flt_ap2i_ipt_r2.bam ../../data/bam/flt_ap2i_ipt_r3.bam ../../data/bam/flt_ap2i_ipt_r4.bam"
+labels: "AP2I_GFP_IPT_R5 AP2I_GFP_R1 AP2I_GFP_R2 AP2I_GFP_R3 AP2I_GFP_R4 AP2I_GFP_R5 AP2I_IGG_IPT_R5 AP2I_IGG_R1 AP2I_IGG_R2 AP2I_IGG_R3 AP2I_IGG_R5 AP2I_IPT_R1 AP2I_IPT_R2 AP2I_IPT_R3 AP2I_IPT_R4"
+blacklist: "../../data/genomes/pfdd2_k150_m2_nonunique.bed"
+extsize: "250"
+

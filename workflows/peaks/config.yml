@@ -1,0 +1,30 @@
+outdir: "../../data/peaks"
+results: "../../results/peaks"
+blacklist: "../../data/genomes/pfdd2_k150_m2_nonunique.bed"
+# Samples ---------------------------------------------------------------------
+samples:
+  ap2i_r1:
+    gfp: "../../data/bam/flt_ap2i_gfp_r1.bam"
+    ipt: "../../data/bam/flt_ap2i_ipt_r1.bam"
+    igg: "../../data/bam/flt_ap2i_igg_r1.bam"
+    extsize: "250"
+  ap2i_r2:
+    gfp: "../../data/bam/flt_ap2i_gfp_r2.bam"
+    ipt: "../../data/bam/flt_ap2i_ipt_r2.bam"
+    igg: "../../data/bam/flt_ap2i_igg_r2.bam"
+    extsize: "250"
+  ap2i_r3:
+    gfp: "../../data/bam/flt_ap2i_gfp_r3.bam"
+    ipt: "../../data/bam/flt_ap2i_ipt_r3.bam"
+    igg: "../../data/bam/flt_ap2i_igg_r3.bam"
+    extsize: "250"
+  ap2i_r4:
+    gfp: "../../data/bam/flt_ap2i_gfp_r4.bam"
+    ipt: "../../data/bam/flt_ap2i_ipt_r4.bam"
+    igg: "../../data/bam/flt_ap2i_igg_r5.bam"
+    extsize: "250"
+  ap2i_r5:
+    gfp: "../../data/bam/flt_ap2i_gfp_r5.bam"
+    ipt: "../../data/bam/flt_ap2i_igg_ipt_r5.bam"
+    igg: "../../data/bam/flt_ap2i_igg_r5.bam"
+    extsize: "250"

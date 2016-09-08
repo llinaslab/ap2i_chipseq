@@ -1,0 +1,43 @@
+---
+title: "Peak calling"
+author: "Philipp Ross"
+date: "`r Sys.Date()`"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 2
+    theme: yeti
+    highlight: default
+    css: ../../assets/styles.css
+---
+
+```{r chunk-options, echo=F}
+knitr::opts_chunk$set(echo = F, fig.align = "center", fig.width = 8, fig.height = 8, tidy = T, error = F, warning = F)
+source("../../scripts/utils.R")
+load_R_essentials()
+sshhh("png")
+sshhh("grid")
+sshhh("DT")
+```
+
+## Fingerprint plots
+
+```{r fingerprint-plots}
+files <- list.files("../../data/peaks", pattern = "fingerprint")
+for (file in files) {
+  img <- readPNG(file)
+  grid.raster(img)
+}
+```
+
+## Peak files
+
+```{r peak-files}
+files <- list.files("../../data/peaks", pattern = "*.narrowPeak")
+peaks <- sapply(files, read_tsv, col_names=F)
+df <- as.data.frame(matrix(unlist(stats),nrow=10,byrow=T))
+datatable(df,rownames=F,pageLength=25)
+```
+
+3. Intersect replicates and show how many peaks are in which replicates

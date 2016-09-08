@@ -1,0 +1,130 @@
+# vim: set ft=python:
+shell.prefix("set -eo pipefail; ")
+
+from os.path import join, basename, dirname, exists
+from os import getcwd, makedirs
+from subprocess import check_output
+from glob import glob
+
+from snakemake.utils import min_version
+
+min_version("3.4.1")
+
+# Globals ---------------------------------------------------------------------
+
+include: "../../config.py"
+configfile: "config.yml"
+
+SAMPLES = list(config["samples"].keys())
+OUTDIR  = config["outdir"]
+RESULTS = config["results"]
+
+# Job Handlers ----------------------------------------------------------------
+
+onsuccess:
+  print("Workflow finished, without any errors!")
+
+#onerror:
+#  shell("send_email.py -t philippross369@gmail.com -s 'Snakefile error' -b {log}")
+
+# Rules -----------------------------------------------------------------------
+
+rule all:
+  input:
+    join(RESULTS, "report.html")
+
+
+# Make 'fingerprint' plots for AP2I samples
+rule plot_fingerprints:
+  input:
+    gfp   = lambda wildcards: config["samples"][wildcards.name]["gfp"],
+    ipt   = lambda wildcards: config["samples"][wildcards.name]["ipt"],
+    igg   = lambda wildcards: config["samples"][wildcards.name]["igg"],
+    blacklist = config["blacklist"]
+  output:
+    pdf = join(OUTDIR, "{name}_fingerprints.pdf"),
+    png = join(OUTDIR, "{name}_fingerprints.png")
+  params:
+    extsize = lambda wildcards: config["samples"][wildcards.name]["extsize"]
+  threads: 8
+  log:
+    join(LOGS, "{name}_fingerprints.log")
+  run:
+    # run plotFingerprint
+    shell("(plotFingerprint --bamfiles {input.gfp} {input.igg} {input.ipt} "+\
+	   "--plotFile {output.pdf} "+\
+    "--extendReads {params.extsize} "+\
+    "--labels GFP IgG Input "+\
+    "--binSize 500 "+\
+    "--plotFileFormat pdf "+\
+    "--plotTitle '{wildcards.name} Fingerprints' "+\
+    "--skipZeros "+\
+    "--blackListFileName {input.blacklist} "+\
+    "--numberOfProcessors {threads}) 2> {log}")
+    # convert to PNG
+    shell("convert -verbose -density 500 -resize '800' {output.pdf} {output.png}")
+
+
+# Call peaks using MACS2
+rule gfp_peaks:
+  input:
+    gfp = lambda wildcards: config["samples"][wildcards.name]["gfp"],
+    ipt = lambda wildcards: config["samples"][wildcards.name]["ipt"]
+  output:
+    join(OUTDIR, "{name}_gfp_summits.bed")
+  params:
+    outdir  = OUTDIR,
+    extsize = lambda wildcards: config["samples"][wildcards.name]["extsize"]
+  log:
+    join(LOGS, "{name}_gfp_peaks.log")
+  run:
+    # call macs2
+    shell("(macs2 callpeak -t {input.gfp} -c {input.ipt} -g 21500000 "+\
+    "--outdir {params.outdir} -n {wildcards.name}_gfp --call-summits -B --fix-bimodal "+\
+    "--extsize {params.extsize}) 2> {log}")
+    # change *.bdg files to *.bedgraph files
+    shell("for file in $(find {params.outdir} -type f -name '*.bdg'); do mv $file ${{file%.bdg}}.bedgraph; done")
+    # convert narrowPeak to BED for ChIPSeeker
+    shell("for file in $(find {params.outdir} -type f -name '*.narrowPeak'); do cat $file | awk '{{print $1,$2,$3,$4,$5}}' > ${{file%.*}}.bed; done")
+
+
+# Call mock peaks using MACS2
+rule igg_peaks:
+  input:
+    igg = lambda wildcards: config["samples"][wildcards.name]["igg"],
+    ipt = lambda wildcards: config["samples"][wildcards.name]["ipt"]
+  output:
+    join(OUTDIR, "{name}_igg_summits.bed")
+  params:
+    outdir  = OUTDIR,
+    extsize = lambda wildcards: config["samples"][wildcards.name]["extsize"]
+  log:
+    join(LOGS, "{name}_igg_peaks.log")
+  run:
+    # call macs2
+    shell("(macs2 callpeak -t {input.igg} -c {input.ipt} -g 21500000 "+\
+    "--outdir {params.outdir} -n {wildcards.name}_igg --call-summits -B --fix-bimodal "+\
+    "--extsize {params.extsize}) 2> {log}")
+    # change *.bdg files to *.bedgraph files
+    shell("for file in $(find {params.outdir} -type f -name '*.bdg'); do mv $file ${{file%.bdg}}.bedgraph; done")
+    # convert narrowPeak to BED for ChIPSeeker
+    shell("for file in $(find {params.outdir} -type f -name '*.narrowPeak'); do cat $file | awk '{{print $1,$2,$3,$4,$5}}' > ${{file%.*}}.bed; done")
+
+
+# Write a report of some kind
+rule report:
+  input:
+    #expand(join(OUTDIR, "{name}_fingerprints.pdf"), name=SAMPLES),
+    expand(join(OUTDIR, "{name}_gfp_summits.bed"),  name=SAMPLES),
+    expand(join(OUTDIR, "{name}_igg_summits.bed"),  name=SAMPLES),
+    script = "report.Rmd"
+  output:
+    join(RESULTS, "report.html")
+  run:
+    shell(source_rmd(getcwd(), input.script, RESULTS))
+
+
+rule clean:
+  run:
+    shell("rm -rf "+join(RESULTS, "report.html"))
+
